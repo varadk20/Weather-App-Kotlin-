@@ -4,8 +4,18 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
+import com.karumi.dexter.BuildConfig
 
 object Constants{
+    //stored in local.properties and defined in build.gradle
+    private val bosskey = com.example.weatherapp.BuildConfig.bosskey
+
+
+    val APP_ID: String = bosskey
+    const val BASE_URL:String = "https://api.openweathermap.org/data/"
+    const val METRIC_UNIT:String = "metric"
+
+
     fun isNetworkAvailable(context: Context): Boolean{
 
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as
