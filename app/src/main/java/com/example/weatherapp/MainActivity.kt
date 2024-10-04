@@ -2,6 +2,7 @@ package com.example.weatherapp
 
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.app.Dialog
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -21,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.getSystemService
 import androidx.core.location.LocationRequestCompat
+import com.example.weatherapp.models.WeatherResponse
+import com.example.weatherapp.network.WeatherService
 import com.example.weatherapp.ui.theme.WeatherAppTheme
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -32,10 +35,17 @@ import com.karumi.dexter.MultiplePermissionsReport
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionRequest
 import com.karumi.dexter.listener.multi.MultiplePermissionsListener
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var mFusedLocationClient : FusedLocationProviderClient //to get latitude and longitude
+
+    private var mProgressDialog: Dialog ? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -112,18 +122,67 @@ class MainActivity : ComponentActivity() {
 
             val longitude = mLastLocation?.longitude
             Log.i("Current Latitude", "$longitude")
-            getLocationWeatherDetails()
+            if (latitude != null && longitude!=null) {
+                getLocationWeatherDetails(latitude, longitude)
+            }
         }
     }
 
 
-    private fun getLocationWeatherDetails(){
+    private fun getLocationWeatherDetails(latitude:Double, longitude:Double){
         if(Constants.isNetworkAvailable(this)){
-            Toast.makeText(
-                this@MainActivity,
-                "You have connected to the Internet. Now you can make an api call.",
-                Toast.LENGTH_SHORT
-            ).show()
+           //connect to api get data
+            val retrofit: Retrofit = Retrofit.Builder().
+            baseUrl(Constants.BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+
+            val service: WeatherService = retrofit
+                .create<WeatherService>(WeatherService::class.java)
+
+            val listCall: Call<WeatherResponse> = service.getWeather(
+                latitude,longitude, Constants.METRIC_UNIT, Constants.APP_ID
+            )
+
+
+            showCustomProgressDialog()
+
+            listCall.enqueue(object : Callback<WeatherResponse>{
+                override fun onResponse(
+                    call: Call<WeatherResponse>,
+                    response: Response<WeatherResponse>
+                ) {
+                    if (response!!.isSuccessful){
+
+                        hideProgressDialog()
+
+                        val weatherList: WeatherResponse? = response.body()
+                        Log.i("Response result", "$weatherList")
+                    }
+                    else{
+                        val rc = response.code()
+                        when(rc){
+                            400->{
+                                Log.e("Error 400", "Bad connection bro")
+                            }
+                            404->{
+                                Log.e("Error 404", "Not found")
+                            }
+                            else->{
+                                Log.e("Error ", "Generic error")
+                            }
+                        }
+                    }
+                }
+
+                override fun onFailure(call: Call<WeatherResponse>, t: Throwable) {
+                    Log.e("Errorrrrr", t!!.message.toString())
+                    hideProgressDialog()
+                }
+
+            })
+
+
         }else{
             Toast.makeText(
                 this@MainActivity,
@@ -167,6 +226,24 @@ class MainActivity : ComponentActivity() {
             LocationManager.NETWORK_PROVIDER
         )
     }
+
+
+    private fun showCustomProgressDialog(){
+        mProgressDialog = Dialog(this)
+        mProgressDialog!!.setContentView(R.layout.dialog_custom_progress)
+
+        mProgressDialog!!.show()
+
+    }
+
+    private fun hideProgressDialog(){
+        if(mProgressDialog!=null){
+            mProgressDialog!!.dismiss()
+        }
+    }
+
+
+
 }
 
 @Composable
